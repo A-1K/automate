@@ -19,7 +19,15 @@
         async function loadConfig() {
             try {
                 const response = await fetch("/env");  // ✅ Securely fetch from backend
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch config: ${response.statusText}`);
+                }
+
                 const env = await response.json();
+
+                if (!env.VITE_MS_CLIENT_ID || !env.VITE_REDIRECT_URI) {
+                    throw new Error("Missing environment variables");
+                }
 
                 const msalConfig = {
                     auth: {
@@ -45,7 +53,7 @@
                 });
             } catch (error) {
                 console.error("Failed to load environment variables:", error);
-                alert("Error loading configuration.");
+                alert(`Error loading configuration: ${error.message}`);
             }
         }
 

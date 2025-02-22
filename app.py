@@ -1,7 +1,12 @@
 import re
 import pdfplumber
+import os
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
@@ -50,6 +55,13 @@ def upload_file():
     transactions = extract_transactions_from_pdf(file)
     
     return jsonify({"transactions": transactions})
+
+@app.route('/env', methods=['GET'])
+def get_env():
+    return jsonify({
+        "VITE_MS_CLIENT_ID": os.getenv("VITE_MS_CLIENT_ID"),
+        "VITE_REDIRECT_URI": os.getenv("VITE_REDIRECT_URI")
+    })
 
 if __name__ == '__main__':
     app.run(debug=True)
