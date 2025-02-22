@@ -105,41 +105,43 @@
         });
 
         // ✅ Fix: Bank Statement Upload
-        document.getElementById('upload-bank-statement-form').addEventListener('submit', async function (e) {
-            e.preventDefault();
-            const fileInput = document.getElementById('bank-statement-file');
-            if (!fileInput.files.length) return alert("Please select a PDF file.");
-            const formData = new FormData();
-            formData.append("file", fileInput.files[0]);
+      // ✅ Fix: Bank Statement Upload
+document.getElementById('upload-bank-statement-form').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const fileInput = document.getElementById('bank-statement-file');
+    if (!fileInput.files.length) return alert("Please select a PDF file.");
+    const formData = new FormData();
+    formData.append("file", fileInput.files[0]);
 
-            try {
-                const response = await fetch("http://127.0.0.1:5000/upload", {
-                    method: "POST",
-                    body: formData
-                });
-                const data = await response.json();
-                console.log("Server Response:", data);
-
-                if (data.transactions && data.transactions.length > 0) {
-                    data.transactions.forEach(({ date, amount, type }) => {
-                        if (!amount || isNaN(amount)) {
-                            console.error("Invalid amount:", amount);
-                            return;
-                        }
-                        let action = type === "credit" ? "added" : "spent";
-                        currentBalance += type === "credit" ? amount : -amount;
-                        updateRemainingBalance();
-                        addLogEntry(amount, date, action, type);
-                    });
-                    alert("Bank statement processed successfully!");
-                } else {
-                    alert("No transactions found.");
-                }
-            } catch (error) {
-                console.error("Error:", error);
-                alert("Failed to process statement.");
-            }
+    try {
+        const response = await fetch("https://automate-backend-c4xc.onrender.com/upload", {
+            method: "POST",
+            body: formData
         });
+        const data = await response.json();
+        console.log("Server Response:", data);
+
+        if (data.transactions && data.transactions.length > 0) {
+            data.transactions.forEach(({ date, amount, type }) => {
+                if (!amount || isNaN(amount)) {
+                    console.error("Invalid amount:", amount);
+                    return;
+                }
+                let action = type === "credit" ? "added" : "spent";
+                currentBalance += type === "credit" ? amount : -amount;
+                updateRemainingBalance();
+                addLogEntry(amount, date, action, type);
+            });
+            alert("Bank statement processed successfully!");
+        } else {
+            alert("No transactions found.");
+        }
+    } catch (error) {
+        console.error("Error:", error);
+        alert("Failed to process statement.");
+    }
+});
+
     </script>
 </body>
 </html>
