@@ -1,0 +1,21 @@
+# Ignore environment files (API keys, secrets)
+.env
+.env.local
+.env.production
+.env.development
+
+# Ignore Python cache & virtual environment
+__pycache__/
+*.pyc
+*.pyo
+venv/
+*.log
+
+# Ignore Node.js dependencies (if applicable)
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Ignore OS/System files
+.DS_Store
+Thumbs.db

@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fund Management</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body class="font-roboto bg-gray-900 text-white min-h-screen flex flex-col items-center p-6">
+    <div class="w-full max-w-2xl bg-gray-800 p-6 rounded-lg shadow-lg">
+        <header class="flex items-center justify-between mb-6">
+            <button class="text-blue-400 text-2xl" onclick="history.back()">
+                <i class="fas fa-arrow-left"></i>
+            </button>
+            <h1 class="text-3xl font-bold">Fund Management</h1>
+            <div></div>
+        </header>
+        <main>
+            <div class="mb-6">
+                <h2 class="text-xl font-semibold mb-2">Current Balance: <span id="remaining-balance" class="text-green-400">PKR 0</span></h2>
+            </div>
+            <div class="space-y-4">
+                <!-- Add Funds -->
+                <form id="add-funds-form" class="bg-gray-700 p-4 rounded-lg">
+                    <h3 class="text-lg font-bold mb-2">Add Funds</h3>
+                    <input id="fund-amount" type="number" placeholder="Enter amount" class="w-full p-2 rounded bg-gray-600 text-white outline-none mb-2">
+                    <button type="submit" class="w-full bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600">Add Funds</button>
+                </form>
+                <!-- Add Expense -->
+                <form id="update-expenses-form" class="bg-gray-700 p-4 rounded-lg">
+                    <h3 class="text-lg font-bold mb-2">Add Expense</h3>
+                    <input id="expense-amount" type="number" placeholder="Enter amount" class="w-full p-2 rounded bg-gray-600 text-white outline-none mb-2">
+                    <input id="expense-description" type="text" placeholder="Enter description" class="w-full p-2 rounded bg-gray-600 text-white outline-none mb-2">
+                    <button type="submit" class="w-full bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600">Add Expense</button>
+                </form>
+                <!-- Upload Bank Statement -->
+                <form id="upload-bank-statement-form" class="bg-gray-700 p-4 rounded-lg">
+                    <h3 class="text-lg font-bold mb-2">Upload Bank Statement</h3>
+                    <input id="bank-statement-file" type="file" accept="application/pdf" class="w-full p-2 rounded bg-gray-600 text-white outline-none mb-2">
+                    <button type="submit" class="w-full bg-yellow-500 text-white px-4 py-2 rounded-lg hover:bg-yellow-600">Process Statement</button>
+                </form>
+            </div>
+            <div class="mt-6">
+                <h3 class="text-lg font-bold mb-2">Monthly Log</h3>
+                <ul id="monthly-log-list" class="bg-gray-700 p-4 rounded-lg max-h-60 overflow-auto space-y-2"></ul>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const addFundsForm = document.getElementById('add-funds-form');
+        const updateExpensesForm = document.getElementById('update-expenses-form');
+        const monthlyLogList = document.getElementById('monthly-log-list');
+        const remainingBalanceElement = document.getElementById('remaining-balance');
+        let currentBalance = 0;
+
+        function updateRemainingBalance() {
+            remainingBalanceElement.textContent = `PKR ${currentBalance}`;
+            remainingBalanceElement.classList.remove('text-green-400', 'text-red-400');
+            remainingBalanceElement.classList.add(currentBalance >= 0 ? 'text-green-400' : 'text-red-400');
+        }
+
+        function addLogEntry(amount, date, action, type = "debit") {
+            const listItem = document.createElement("li");
+            let colorClass = type === "credit" ? "text-green-400" : "text-red-400";
+            listItem.innerHTML = `<strong>${date}:</strong> PKR ${amount} ${action}`;
+            listItem.classList.add(colorClass);
+            monthlyLogList.appendChild(listItem);
+        }
+
+        // ✅ Fix: Add Funds Form
+        addFundsForm.addEventListener("submit", (e) => {
+            e.preventDefault();
+            const amount = parseFloat(document.getElementById("fund-amount").value);
+            if (isNaN(amount) || amount <= 0) {
+                alert("Please enter a valid amount.");
+                return;
+            }
+            currentBalance += amount;
+            updateRemainingBalance();
+            addLogEntry(amount, new Date().toLocaleDateString(), "added", "credit");
+            document.getElementById("fund-amount").value = "";
+        });
+
+        // ✅ Fix: Expense Form Now Works
+        updateExpensesForm.addEventListener("submit", (e) => {
+            e.preventDefault();
+            const amount = parseFloat(document.getElementById("expense-amount").value);
+            const description = document.getElementById("expense-description").value.trim();
+            if (isNaN(amount) || amount <= 0) {
+                alert("Please enter a valid amount.");
+                return;
+            }
+            if (!description) {
+                alert("Please enter a description.");
+                return;
+            }
+            currentBalance -= amount;
+            updateRemainingBalance();
+            addLogEntry(amount, new Date().toLocaleDateString(), `spent on ${description}`, "debit");
+            document.getElementById("expense-amount").value = "";
+            document.getElementById("expense-description").value = "";
+        });
+
+        // ✅ Fix: Bank Statement Upload
+        document.getElementById('upload-bank-statement-form').addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const fileInput = document.getElementById('bank-statement-file');
+            if (!fileInput.files.length) return alert("Please select a PDF file.");
+            const formData = new FormData();
+            formData.append("file", fileInput.files[0]);
+
+            try {
+                const response = await fetch("http://127.0.0.1:5000/upload", {
+                    method: "POST",
+                    body: formData
+                });
+                const data = await response.json();
+                console.log("Server Response:", data);
+
+                if (data.transactions && data.transactions.length > 0) {
+                    data.transactions.forEach(({ date, amount, type }) => {
+                        if (!amount || isNaN(amount)) {
+                            console.error("Invalid amount:", amount);
+                            return;
+                        }
+                        let action = type === "credit" ? "added" : "spent";
+                        currentBalance += type === "credit" ? amount : -amount;
+                        updateRemainingBalance();
+                        addLogEntry(amount, date, action, type);
+                    });
+                    alert("Bank statement processed successfully!");
+                } else {
+                    alert("No transactions found.");
+                }
+            } catch (error) {
+                console.error("Error:", error);
+                alert("Failed to process statement.");
+            }
+        });
+    </script>
+</body>
+</html>

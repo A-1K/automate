@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Email & Teams Summarizer - Student Automate</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet"/>
+    <script src="https://alcdn.msauth.net/browser/2.14.2/js/msal-browser.min.js"></script>
+</head>
+<body class="bg-gray-900 text-white flex flex-col items-center justify-center h-screen">
+    <div class="bg-gray-800 p-8 rounded-lg shadow-lg w-96">
+        <h1 class="text-2xl font-bold mb-4">Email & Teams Summarizer</h1>
+        <button class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" id="fetchNotificationsButton">
+            Fetch Notifications
+        </button>
+        <div class="mt-4" id="notificationList"></div>
+        <button class="mt-4 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded" onclick="window.history.back()">Go Back</button>
+    </div>
+
+    <div class="fixed inset-0 bg-gray-900 text-white flex flex-col items-center justify-center hidden" id="notificationsPage">
+        <div class="w-full max-w-4xl p-4 overflow-y-auto h-full bg-gray-800 rounded-lg shadow-lg">
+            <button class="bg-red-500 text-white px-4 py-2 rounded mb-4" id="closeNotifications">Close</button>
+            <div id="notificationContainer"></div>
+        </div>
+    </div>
+
+    <script>
+        async function loadConfig() {
+            try {
+                const response = await fetch("/env");  // ✅ Securely fetch backend-stored API keys
+                const env = await response.json();
+
+                const msalConfig = {
+                    auth: {
+                        clientId: env.clientId,
+                        authority: "https://login.microsoftonline.com/common",
+                        redirectUri: env.redirectUri
+                    }
+                };
+
+                const msalInstance = new msal.PublicClientApplication(msalConfig);
+
+                // ✅ Attach event listener only after MSAL is initialized
+                document.getElementById('fetchNotificationsButton').addEventListener('click', async () => {
+                    try {
+                        const accounts = msalInstance.getAllAccounts();
+                        if (accounts.length > 0) {
+                            const accessToken = await msalInstance.acquireTokenSilent({
+                                scopes: ["User.Read", "Mail.Read", "Mail.ReadWrite", "Team.ReadBasic.All"],
+                                account: accounts[0]
+                            });
+                            fetchNotifications(accessToken.accessToken);
+                        } else {
+                            alert('Please sign in first.');
+                        }
+                    } catch (error) {
+                        console.error('Error fetching notifications:', error);
+                        alert(`Error fetching notifications: ${error.message}`);
+                    }
+                });
+            } catch (error) {
+                console.error("Failed to load environment variables:", error);
+                alert("Error loading configuration.");
+            }
+        }
+
+        async function fetchNotifications(accessToken) {
+            try {
+                const response = await fetch("https://graph.microsoft.com/v1.0/me/mailFolders/Inbox/messages?$filter=isRead eq false&$top=20", {
+                    headers: { "Authorization": `Bearer ${accessToken}` }
+                });
+                const data = await response.json();
+                displaySummarizedNotifications(data);
+            } catch (error) {
+                console.error("API error:", error);
+                alert(`Failed to fetch notifications: ${error.message}`);
+            }
+        }
+
+        async function summarizeText(text) {
+            try {
+                const response = await fetch("/summarize", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ text })
+                });
+
+                const data = await response.json();
+                return data.summary || "Could not summarize.";
+            } catch (error) {
+                console.error("Summarization error:", error);
+                return "Could not summarize.";
+            }
+        }
+
+        function predictImportance(message) {
+            const subject = message.subject?.toLowerCase() || "";
+            const body = message.bodyPreview?.toLowerCase() || "";
+
+            // Highest importance (9-10): Exams, quizzes, attendance, registration
+            const criticalKeywords = ["quiz", "exam", "midterm", "final", "attendance", "grade", "marks", "result", "deadline", "registration", "course", "drop", "add", "withdrawal"];
+
+            // High importance (7-8): Assignments, labs, academic slides, university notices
+            const highKeywords = ["assignment", "homework", "lab", "slides", "lecture", "office hours", "schedule", "academic", "notice", "announcement"];
+
+            // Medium importance (5-6): Career, research access, educational events
+            const mediumKeywords = ["internship", "career", "job", "workshop", "conference", "opportunity", "recruitment", "science direct", "digital library", "access granted", "networking"];
+
+            // Low importance (3-4): General events, external training, reminders
+            const lowKeywords = ["event", "expo", "training", "session", "invitation", "webinar", "reminder"];
+
+            // Lowest importance (1-2): Sports, society events, recreational activities
+            const lowestKeywords = ["sports", "championship", "tournament", "match", "requisition", "society", "club", "festival", "competition"];
+
+            for (const keyword of criticalKeywords) if (subject.includes(keyword) || body.includes(keyword)) return 10;
+            for (const keyword of highKeywords) if (subject.includes(keyword) || body.includes(keyword)) return 8;
+            for (const keyword of mediumKeywords) if (subject.includes(keyword) || body.includes(keyword)) return 6;
+            for (const keyword of lowKeywords) if (subject.includes(keyword) || body.includes(keyword)) return 4;
+            for (const keyword of lowestKeywords) if (subject.includes(keyword) || body.includes(keyword)) return 2;
+
+            return 5; // Default to medium importance if no keywords match
+        }
+
+        async function displaySummarizedNotifications(outlookData) {
+            const notificationContainer = document.getElementById('notificationContainer');
+            notificationContainer.innerHTML = '';
+
+            if (outlookData.value) {
+                for (const message of outlookData.value) {
+                    const summary = await summarizeText(message.bodyPreview);
+                    const importanceRating = predictImportance(message);
+                    const notificationItem = document.createElement('div');
+                    notificationItem.className = 'p-4 mb-4 bg-gray-700 rounded-lg shadow';
+                    notificationItem.innerHTML = `
+                        <h3 class="font-semibold text-lg text-blue-400">${message.subject || "No Subject"}</h3>
+                        <p class="text-sm text-gray-300">From: ${message.from?.emailAddress?.address || 'Unknown'}</p>
+                        <p class="mt-2">${summary}</p>
+                        <p class="text-sm text-yellow-400">Importance Rating: ${importanceRating}/10</p>
+                    `;
+                    notificationContainer.appendChild(notificationItem);
+                }
+            }
+            document.getElementById('notificationsPage').classList.remove('hidden');
+        }
+
+        document.getElementById('closeNotifications').addEventListener('click', () => {
+            document.getElementById('notificationsPage').classList.add('hidden');
+        });
+
+        loadConfig();  // ✅ Load API keys & MSAL config on page load
+    </script>
+</body>
+</html>
