@@ -15,7 +15,7 @@ const msalConfig = {
     auth: {
         clientId: process.env.MS_CLIENT_ID,  // 🔒 Changed variable name to match .env
         authority: "https://login.microsoftonline.com/common",
-        redirectUri: process.env.REDIRECT_URI || "http://localhost:3000/auth/callback"
+        redirectUri: process.env.REDIRECT_URI || "https://automate-k0it.onrender.com//auth/callback"
     }
 };
 
