@@ -56,13 +56,11 @@ def upload_file():
     
     return jsonify({"transactions": transactions})
 
-@app.route("/debug-env", methods=['GET'])
-def debug_env():
+@app.route('/env', methods=['GET'])
+def get_env():
     return jsonify({
-        "AZURE_CLIENT_ID": os.getenv("AZURE_CLIENT_ID"),
-        "AZURE_REDIRECT_URI": os.getenv("AZURE_REDIRECT_URI"),
-        "Current Directory": os.getcwd(),
-        "Python Version": sys.version
+        "VITE_MS_CLIENT_ID": os.getenv("VITE_MS_CLIENT_ID"),
+        "VITE_REDIRECT_URI": os.getenv("VITE_REDIRECT_URI")
     })
 
 if __name__ == '__main__':
